@@ -1,28 +1,5 @@
 """
 A plugin to repair mesh for 3D printing.
-
-It's a naive attempt at mesh repair, by relying a lot on Blender's built-in functionalities.
-The algorithm finds non-manifold vertices (possibly bordering holes) and fills them in.
-Since the fill can generate new non-manifold vertices, it checks if there are any non-manifold vertices after the fill,
-and deletes them. Since the deletion can create new holes,
-this algorithm loops until there are no more non-manifold vertices.
-I assume convergence to a repaired mesh. Please email me if this is not the case.
-
-I created functionality to remove multiple shells, through boolean intersection,
-but due to Blender's use of the Carve library, it sometimes will crash when intersecting certain objects
-(or will fail silently unless you inspect the terminal console). I've disabled it for now.
-It definitely works for with simple meshes but fails the complex test.
-This is not a huge problem, as the repair will produce a mesh that passes standard checks like netfabb.
-
-I've also disabled reduction of polygons, through decimation.
-Still deciding if this should be left up to the user or have it be a part of mesh repair.
-Polygon reduction is important if there's a polygon cap on the slicer, or in general,
-increases the speed which the slicer generates G-code for 3D printers.
-
-TODO:
-1. Patch Boolean intersection to not crash.
-2. Handle thiness constraints for 3D printability
-3. If rolling in decimation, implement a true density-based approach for determining a vertex-dense mesh
 """
 
 bl_info = {
@@ -55,8 +32,6 @@ def remove_shells(context):
 
 
     for mesh_object in mesh_objects[1:]:
-        print(mesh_object)
-        input("mesh boolean: ")
 
         context.scene.objects.active = final_mesh_object
         final_mesh_object.select = True
@@ -116,7 +91,7 @@ def fix_non_manifold(context):
     non_manifold_vertices = mesh.total_vert_sel
 
     while non_manifold_vertices > 0:
-        print("Non-manifold vertices: " + str(non_manifold_vertices))
+        #print("Non-manifold vertices: " + str(non_manifold_vertices))
 
         #fix non-manifold
         bpy.ops.mesh.fill_holes()
