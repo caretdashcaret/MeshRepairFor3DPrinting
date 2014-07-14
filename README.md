@@ -3,6 +3,10 @@ Mesh Repair for 3D Printing
 
 A [Blender](http://www.blender.org/) add-on to repair meshes for 3D printing.
 
+[![Mesh Repair]
+(http://i1115.photobucket.com/albums/k552/caretdashcaret/2014-07/Screenshot2014-07-13at74220PM_zpsbfbe4047.png)]
+(https://github.com/caretdashcaret/MeshRepairFor3DPrinting/blob/master/add_on/repair.py)
+
 It's a naive attempt at mesh repair, by relying a lot on Blender's built-in functionalities.
 
 The algorithm finds non-manifold vertices (possibly bordering holes) and fills them in.
