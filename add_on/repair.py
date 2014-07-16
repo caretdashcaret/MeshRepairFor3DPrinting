@@ -123,6 +123,7 @@ class MeshRepairFor3DP(bpy.types.Operator):
 
         #remove duplicate vertices
         bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_mode(type="VERT")
         bpy.ops.mesh.select_all(action="SELECT")
         bpy.ops.mesh.remove_doubles(use_unselected=True)
 
