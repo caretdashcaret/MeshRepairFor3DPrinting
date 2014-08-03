@@ -14,9 +14,9 @@ Since the fill can generate new non-manifold vertices, it checks if there are an
 and deletes them. Since the deletion can create new holes,
 this algorithm loops until there are no more non-manifold vertices.
 
-I assume convergence to a repaired mesh.
-Please email me if this is not the case.
-I'd love to find a non-converging case.
+I assume convergence to a repaired mesh. The repair will terminate if in one iteration of the repair,
+it could not repair anything and the same non-manifold vertices remain. It will also terminate
+if the number of iterations exceed the `max_interation`.
 
 To Run
 -------------
@@ -28,10 +28,9 @@ The add-on is not rolled into the official Blender release, and must be self ins
 In `OBJECT` mode, select the mesh object and run the add-on
 (shortcut: press `spacebar` and type `Mesh Repair for 3D Printing`)
 
-It may take a while depending on the complexity of the mesh.
-You can uncomment out the `print` in `fix_non_manifold` to track the progress.
-
-You can uncomment `remove_shells` in `execute` to remove multiple shells. This is unstable for complex meshes.
+There are three parameters you can set. `threshold` determines how far away vertices are away from each other before
+the are counted as duplicates. `sides` is the default number of sides for repairing holes. `max_iteration` is
+the maximum iteration the internal `fix_non_manifold` loop will run before it decides the mesh is unrepairable.
 
 License
 -------------
