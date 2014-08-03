@@ -7,7 +7,7 @@ A [Blender](http://www.blender.org/) add-on to repair meshes for 3D printing.
 (http://i1115.photobucket.com/albums/k552/caretdashcaret/2014-07/Screenshot2014-07-13at74220PM_zpsbfbe4047.png)]
 (https://github.com/caretdashcaret/MeshRepairFor3DPrinting/blob/master/add_on/repair.py)
 
-It's a naive attempt at mesh repair, by relying a lot on Blender's built-in functionalities.
+It's a naive attempt at mesh repair of non-manifolds, by relying a lot on Blender's built-in functionalities.
 
 The algorithm finds non-manifold vertices (possibly bordering holes) and fills them in.
 Since the fill can generate new non-manifold vertices, it checks if there are any non-manifold vertices after the fill,
@@ -17,17 +17,6 @@ this algorithm loops until there are no more non-manifold vertices.
 I assume convergence to a repaired mesh.
 Please email me if this is not the case.
 I'd love to find a non-converging case.
-
-I created functionality to remove multiple shells, through boolean intersection,
-but due to Blender's use of the Carve library, it sometimes will crash when intersecting certain objects
-(or will fail silently unless you inspect the terminal console). I've disabled it for now.
-It definitely works for with simple meshes but fails my complex mesh test.
-This is not a huge problem, as the repair will produce a mesh that passes standard checks like netfabb.
-
-I've also disabled reduction of polygons, through decimation.
-Still deciding if this should be left up to the user or have it be a part of mesh repair.
-Polygon reduction is important if there's a polygon cap on the slicer, or in general,
-increases the speed which the slicer generates G-code for 3D printers.
 
 To Run
 -------------
@@ -43,14 +32,6 @@ It may take a while depending on the complexity of the mesh.
 You can uncomment out the `print` in `fix_non_manifold` to track the progress.
 
 You can uncomment `remove_shells` in `execute` to remove multiple shells. This is unstable for complex meshes.
-
-To Do
--------------
-
-* Patch Boolean intersection to not crash.
-* Handle thiness constraints for 3D printability
-* If rolling in decimation, implement a true density-based approach for determining a vertex-dense mesh
-* Roll into Blender's 3D Printing Toolbox
 
 License
 -------------

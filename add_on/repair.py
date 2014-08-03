@@ -10,147 +10,130 @@ bl_info = {
 import bpy
 
 
-def remove_shells(context):
-    """
-    separate each loose mesh into a new object, then boolean merge them all together
-    """
-
-    original_object = context.scene.objects.active
-
-    #separate loose mesh
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.separate(type="LOOSE")
-
-    #find all mesh objects in scene
-    bpy.ops.object.mode_set(mode="OBJECT")
-    mesh_objects = [obj for obj in context.scene.objects if type(obj.data) == bpy.types.Mesh]
-    bpy.ops.object.select_all(action="DESELECT")
-
-    #boolean union all
-    final_mesh_object = mesh_objects[0]
-    original_object.select = False
-
-
-    for mesh_object in mesh_objects[1:]:
-
-        context.scene.objects.active = final_mesh_object
-        final_mesh_object.select = True
-        #mode_set needs to come after setting an active object
-        bpy.ops.object.mode_set(mode="OBJECT")
-
-        bpy.ops.object.modifier_add(type="BOOLEAN")
-        final_mesh_object.modifiers["Boolean"].operation = "UNION"
-        final_mesh_object.modifiers["Boolean"].object = mesh_object
-        bpy.ops.object.modifier_apply(apply_as="DATA", modifier="Boolean")
-
-        bpy.ops.object.modifier_add(type="BOOLEAN")
-        final_mesh_object.modifiers["Boolean"].operation = "UNION"
-        final_mesh_object.modifiers["Boolean"].object = mesh_object
-        bpy.ops.object.modifier_apply(apply_as="DATA", modifier="Boolean")
-        
-        #delete after union-ed
-        final_mesh_object.select = False
-        context.scene.objects.active = mesh_object
-        mesh_object.select = True
-        bpy.ops.object.delete()
-
-    #select the final mesh object
-    context.scene.objects.active = final_mesh_object
-    final_mesh_object.select = True
-    return final_mesh_object
-
-
-def decimate(context, deshelled_mesh_object):
-    """decimate to reduce polygons"""
-    bpy.ops.object.mode_set(mode="OBJECT")
-    context.scene.objects.active = deshelled_mesh_object
-
-    bpy.ops.object.modifier_add(type="DECIMATE")
-    deshelled_mesh_object.modifiers["Decimate"].ratio = 0.5
-    bpy.ops.object.modifier_apply(apply_as="DATA", modifier="Decimate")
-
-
-def has_dense_vertices(mesh_object):
-    """determine if the vertex density is high"""
-    max_faces = 500000
-
-    if len(mesh_object.data.polygons) > max_faces:
-        return True
-
-    return False
-
-
-def fix_non_manifold(context):
-    """naive iterate-until-no-more approach for fixing manifolds"""
-    bpy.ops.object.mode_set(mode="EDIT")
-    mesh = context.scene.objects.active.data
-
-    bpy.ops.mesh.select_all(action="DESELECT")
-    bpy.ops.mesh.select_non_manifold()
-
-    non_manifold_vertices = mesh.total_vert_sel
-
-    while non_manifold_vertices > 0:
-        #print("Non-manifold vertices: " + str(non_manifold_vertices))
-
-        #fix non-manifold
-        bpy.ops.mesh.fill_holes()
-
-        bpy.ops.mesh.select_all(action="DESELECT")
-        bpy.ops.mesh.select_non_manifold()
-        bpy.ops.mesh.fill()
-
-        #have all normals face outwards
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.normals_make_consistent()
-
-        bpy.ops.mesh.select_all(action="DESELECT")
-        bpy.ops.mesh.select_non_manifold()
-
-        bpy.ops.mesh.delete(type='VERT')
-
-        bpy.ops.mesh.select_non_manifold()
-        non_manifold_vertices = mesh.total_vert_sel
-
-
 class MeshRepairFor3DP(bpy.types.Operator):
-    """Script for a naive mesh repair for 3D printing"""
+    """Script for a non-manifold mesh repair for 3D printing"""
     bl_idname = "mesh.mesh_repair_for_3dp"
     bl_label = "Mesh Repair for 3D Printing"
     bl_options = {'REGISTER', 'UNDO'}
 
+    threshold = bpy.props.FloatProperty(name="threshold",
+                                        description="Minimum distance between elements to merge",
+                                        default=0.0001)
+
+    sides = bpy.props.IntProperty(name="sides",
+                                  description="Number of sides in hole required to fill",
+                                  default=4)
+
+    max_iterations = bpy.props.IntProperty(name="max_iterations",
+                                           description="Max number of iterations to run the internal repair",
+                                           default=200)
+
+    selected_mesh = None
+
     def execute(self, context):
 
-        #remove duplicate vertices
-        bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.select_mode(type="VERT")
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.remove_doubles(use_unselected=True)
+        self.setup_environment()
 
-        #delete loose vertices/edges/faces
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.delete_loose()
+        self.remove_doubles()
 
-        #dissolve zero area faces and zero length edges
-        bpy.ops.mesh.dissolve_degenerate()
+        self.dissolve_degenerate()
 
-        fix_non_manifold(context)
+        self.set_selected_mesh(context)
 
-        #have all normals face outwards
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.normals_make_consistent()
+        try:
+            self.fix_non_manifold()
+        except RuntimeError as e:
+            print("RuntimeError:", e)
+            return {'CANCELLED'}
 
-        ##boolean union all mesh to remove shells and self intersections
-        #deshelled_mesh_object = remove_shells(context)
-
-        ##decimate to reduce polygons
-        #if has_dense_vertices(deshelled_mesh_object):
-        #    decimate(context, deshelled_mesh_object)
+        self.make_normals_consistently_outwards()
 
         #end in object mode
         bpy.ops.object.mode_set(mode="OBJECT")
+
         return {'FINISHED'}
 
+    def setup_environment(self):
+        """set the mode as edit, select mode as vertices, and reveal hidden vertices"""
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_mode(type="VERT")
+        bpy.ops.mesh.reveal()
+
+    def remove_doubles(self):
+        """remove duplicate vertices"""
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.remove_doubles(threshold=self.threshold)
+
+    def delete_loose(self):
+        """delete loose vertices/edges/faces"""
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.delete_loose()
+
+    def dissolve_degenerate(self):
+        """dissolve zero area faces and zero length edges"""
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.dissolve_degenerate(threshold=self.threshold)
+
+    def make_normals_consistently_outwards(self):
+        """have all normals face outwards"""
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.normals_make_consistent()
+
+    def fix_non_manifold(self):
+        """naive iterate-until-no-more approach for fixing manifolds"""
+        non_manifold_vertices = self.get_non_manifold_vertices()
+        current_iteration = 0
+
+        while len(non_manifold_vertices) > 0:
+
+            if current_iteration > self.max_iterations:
+                raise RuntimeError('Exceeded maximum iterations, terminated early')
+
+            self.fill_non_manifold()
+
+            self.make_normals_consistently_outwards()
+
+            self.delete_newly_generated_non_manifold_vertices()
+
+            new_non_manifold_vertices = self.get_non_manifold_vertices()
+            if new_non_manifold_vertices == non_manifold_vertices:
+                raise RuntimeError("Not possible to repair, non-ending loop occurred")
+            else:
+                non_manifold_vertices = new_non_manifold_vertices
+                current_iteration += 1
+
+    def set_selected_mesh(self, context):
+        """set the selected mesh from context data"""
+        self.selected_mesh = context.scene.objects.active.data
+
+    def get_non_manifold_vertices(self):
+        """return a set of coordinates of non-manifold vertices"""
+        bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.mesh.select_non_manifold()
+
+        print("Non-manifold remaining:", self.selected_mesh.total_vert_sel)
+
+        #Have to toggle mode for select vertices to work
+        bpy.ops.object.mode_set(mode="OBJECT")
+        selected_vertices = {(v.co[0], v.co[1], v.co[2]) for v in self.selected_mesh.vertices if v.select}
+        bpy.ops.object.mode_set(mode="EDIT")
+
+        return selected_vertices
+
+    def fill_non_manifold(self):
+        """fill holes and then fill in any remnant non-manifolds"""
+        bpy.ops.mesh.fill_holes(sides=self.sides)
+
+        #fill selected edge faces, which could be additional holes
+        bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.mesh.select_non_manifold()
+        bpy.ops.mesh.fill()
+
+    def delete_newly_generated_non_manifold_vertices(self):
+        """delete any newly generated vertices from the filling repair"""
+        bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.mesh.select_non_manifold()
+        bpy.ops.mesh.delete(type='VERT')
 
 def register():
     bpy.utils.register_class(MeshRepairFor3DP)
