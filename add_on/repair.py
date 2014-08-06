@@ -14,7 +14,7 @@ class MeshRepairFor3DP(bpy.types.Operator):
     """Script for a non-manifold mesh repair for 3D printing"""
     bl_idname = "mesh.mesh_repair_for_3dp"
     bl_label = "Mesh Repair for 3D Printing"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
     threshold = bpy.props.FloatProperty(name="threshold",
                                         description="Minimum distance between elements to merge",
@@ -33,25 +33,22 @@ class MeshRepairFor3DP(bpy.types.Operator):
     def execute(self, context):
 
         self.setup_environment()
-
         self.remove_doubles()
-
         self.dissolve_degenerate()
-
         self.set_selected_mesh(context)
 
         try:
             self.fix_non_manifold()
         except RuntimeError as e:
             print("RuntimeError:", e)
-            return {'CANCELLED'}
+            return {"CANCELLED"}
 
         self.make_normals_consistently_outwards()
 
         #end in object mode
         bpy.ops.object.mode_set(mode="OBJECT")
 
-        return {'FINISHED'}
+        return {"FINISHED"}
 
     def setup_environment(self):
         """set the mode as edit, select mode as vertices, and reveal hidden vertices"""
@@ -87,7 +84,7 @@ class MeshRepairFor3DP(bpy.types.Operator):
         while len(non_manifold_vertices) > 0:
 
             if current_iteration > self.max_iterations:
-                raise RuntimeError('Exceeded maximum iterations, terminated early')
+                raise RuntimeError("Exceeded maximum iterations, terminated early")
 
             self.fill_non_manifold()
 
@@ -106,13 +103,13 @@ class MeshRepairFor3DP(bpy.types.Operator):
         """set the selected mesh from context data"""
         self.selected_mesh = context.scene.objects.active.data
 
-    def get_non_manifold_vertices(self):
-        """return a set of coordinates of non-manifold vertices"""
+    def select_non_manifold_vertices(self):
+        """select non-manifold vertices"""
         bpy.ops.mesh.select_all(action="DESELECT")
         bpy.ops.mesh.select_non_manifold()
 
-        print("Non-manifold remaining:", self.selected_mesh.total_vert_sel)
-
+    def selected_vertices_to_coords(self):
+        """returns a set of the coordinates of selected vertices"""
         #Have to toggle mode for select vertices to work
         bpy.ops.object.mode_set(mode="OBJECT")
         selected_vertices = {(v.co[0], v.co[1], v.co[2]) for v in self.selected_mesh.vertices if v.select}
@@ -120,20 +117,27 @@ class MeshRepairFor3DP(bpy.types.Operator):
 
         return selected_vertices
 
+    def get_non_manifold_vertices(self):
+        """return a set of coordinates of non-manifold vertices"""
+        self.select_non_manifold_vertices()
+
+        print("Non-manifold remaining:", self.selected_mesh.total_vert_sel)
+
+        return self.selected_vertices_to_coords()
+
     def fill_non_manifold(self):
         """fill holes and then fill in any remnant non-manifolds"""
         bpy.ops.mesh.fill_holes(sides=self.sides)
 
         #fill selected edge faces, which could be additional holes
-        bpy.ops.mesh.select_all(action="DESELECT")
-        bpy.ops.mesh.select_non_manifold()
+        self.select_non_manifold_vertices()
         bpy.ops.mesh.fill()
 
     def delete_newly_generated_non_manifold_vertices(self):
         """delete any newly generated vertices from the filling repair"""
-        bpy.ops.mesh.select_all(action="DESELECT")
-        bpy.ops.mesh.select_non_manifold()
-        bpy.ops.mesh.delete(type='VERT')
+        self.select_non_manifold_vertices()
+        bpy.ops.mesh.delete(type="VERT")
+
 
 def register():
     bpy.utils.register_class(MeshRepairFor3DP)
