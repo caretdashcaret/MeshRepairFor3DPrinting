@@ -1,15 +1,18 @@
 Mesh Repair for 3D Printing
 ============
 
+**Deprecated** - Rolled into to Blender's `3D Printing Toolbox` as `Clean Up Non-Manifolds` [Patch T41093](https://developer.blender.org/rBAa88a2e646018b3f9b8d1f818f0a08370b2a0dd67).
+
+------------
 A [Blender](http://www.blender.org/) add-on to repair meshes for 3D printing.
 
 [![Mesh Repair]
 (http://i1115.photobucket.com/albums/k552/caretdashcaret/2014-07/Screenshot2014-07-13at74220PM_zpsbfbe4047.png)]
 (https://github.com/caretdashcaret/MeshRepairFor3DPrinting/blob/master/add_on/repair.py)
 
-It's a naive attempt at mesh repair of non-manifolds, by relying a lot on Blender's built-in functionalities.
+It's an attempt at repair of non-manifolds.
 
-The algorithm finds non-manifold vertices (possibly bordering holes) and fills them in.
+The algorithm selects non-manifold vertices (assumes they are holes) and fills them in.
 Since the fill can generate new non-manifold vertices, it checks if there are any non-manifold vertices after the fill,
 and deletes them. Since the deletion can create new holes,
 this algorithm loops until there are no more non-manifold vertices.
