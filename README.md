@@ -21,6 +21,8 @@ I assume convergence to a repaired mesh. The repair will terminate if in one ite
 it could not repair anything and the same non-manifold vertices remain. It will also terminate
 if the number of iterations exceed the `max_interation`.
 
+This works well for models with dense polygons but may not work for all models. Read my [blog article](https://caretdashcaret.wordpress.com/2014/12/04/lets-talk-mesh-repair/) to learn about complexities of mesh repair.
+
 To Run
 -------------
 
